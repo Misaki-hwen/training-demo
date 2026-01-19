@@ -807,6 +807,13 @@
             <div class="filter-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <div style="display: flex; gap: 10px;">
                     <el-input v-model="searchKeyword" placeholder="培训营/计划名称" style="width: 200px;" clearable></el-input>
+                    <el-select v-model="filterStatus" placeholder="状态筛选" style="width: 150px;" clearable>
+                        <el-option label="草稿" value="Draft"></el-option>
+                        <el-option label="未开始" value="Pending"></el-option>
+                        <el-option label="待招募" value="Recruiting"></el-option>
+                        <el-option label="进行中" value="Ongoing"></el-option>
+                        <el-option label="已结束" value="Finished"></el-option>
+                    </el-select>
                     <el-date-picker v-model="filterDateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 240px;"></el-date-picker>
                     <el-button type="primary" @click="handleSearch">查询</el-button>
                 </div>
@@ -852,8 +859,7 @@
                                      <el-dropdown-item v-if="scope.row.status === 'Pending'" @click="handleStart(scope.row)">启动</el-dropdown-item>
                                      <el-dropdown-item @click="handleEdit(scope.row)">修改</el-dropdown-item>
                                      <el-dropdown-item @click="handleConfigCourses(scope.row)">配置课程</el-dropdown-item>
-                                     <el-dropdown-item @click="handleConfirm(scope.row)">确认名单</el-dropdown-item>
-                                     <el-dropdown-item divided @click="handleDelete(scope.row)">删除</el-dropdown-item>
+                                    <el-dropdown-item divided @click="handleDelete(scope.row)">删除</el-dropdown-item>
                                  </el-dropdown-menu>
                              </template>
                          </el-dropdown>
@@ -901,7 +907,7 @@
                     <el-form-item label="培训时间" prop="dateRange">
                         <el-date-picker v-model="form.dateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 100%"></el-date-picker>
                     </el-form-item>
-                    <div v-if="isViewMode && (currentCampCourses && currentCampCourses.length)" class="section-title">课程明细（课程 + 时间 + 地点）</div>
+                    <div v-if="isViewMode && (currentCampCourses && currentCampCourses.length)" class="section-title">课程明细（课程 + 时间）</div>
                     <el-timeline v-if="isViewMode && (currentCampCourses && currentCampCourses.length)">
                         <el-timeline-item
                             v-for="item in currentCampCourses"
@@ -911,7 +917,7 @@
                         >
                             <div style="font-weight: 500; margin-bottom: 4px;">{{ item.name }}</div>
                             <div style="color: #909399; font-size: 12px; margin-top: 4px;">
-                                时间：{{ item.schedule }} ｜ 地点：{{ item.location }}
+                                时间：{{ item.schedule }} - {{ item.scheduleEnd }}
                             </div>
                         </el-timeline-item>
                     </el-timeline>
@@ -986,6 +992,7 @@
                 </el-form>
                 <template #footer>
                     <el-button @click="dialogVisible = false">{{ isViewMode ? '关闭' : '取消' }}</el-button>
+                    <el-button type="warning" @click="saveDraft" v-if="!isViewMode">保存草稿</el-button>
                     <el-button type="primary" @click="submitForm" v-if="!isViewMode">保存配置</el-button>
                 </template>
             </el-dialog>
@@ -1027,9 +1034,20 @@
                             />
                         </template>
                     </el-table-column>
-                    <el-table-column label="上课地点" width="220">
+                    <el-table-column label="下课时间" width="220">
                         <template #default="scope">
-                            <el-input v-model="scope.row.location" placeholder="请输入地点" />
+                            <el-date-picker
+                                v-model="scope.row.scheduleEnd"
+                                type="datetime"
+                                value-format="YYYY-MM-DD HH:mm"
+                                placeholder="选择时间"
+                                style="width: 100%;"
+                            />
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="80">
+                        <template #default="scope">
+                            <el-button type="danger" size="small" link @click="scope.row.selected = false">移除</el-button>
                         </template>
                     </el-table-column>
                 </el-table>
@@ -1194,9 +1212,8 @@
             <div class="filter-container">
                 <el-input placeholder="计划/企业名称" style="width: 200px;"></el-input>
                 <el-select placeholder="状态" style="width: 120px;">
-                    <el-option label="待确认" value="Assigned"></el-option>
+                    <el-option label="待招募" value="PendingRecruitment"></el-option>
                     <el-option label="招募中" value="Publishing"></el-option>
-                    <el-option label="报名截止" value="Closed"></el-option>
                     <el-option label="未开始" value="NotStarted"></el-option>
                     <el-option label="进行中" value="Training"></el-option>
                     <el-option label="已结束" value="Finished"></el-option>
@@ -1231,7 +1248,7 @@
                     <template #default="scope">
                         <el-dropdown>
                             <el-button size="small" type="primary">
-                                操作
+                                更多
                                 <i class="el-icon-arrow-down el-icon--right"></i>
                             </el-button>
                             <template #dropdown>
@@ -1239,9 +1256,7 @@
                                     <el-dropdown-item @click="handleDetail(scope.row)">查看详情</el-dropdown-item>
                                     <el-dropdown-item v-if="scope.row.status === 'Assigned'" @click="handleConfirm(scope.row)">接收</el-dropdown-item>
                                     <el-dropdown-item v-if="scope.row.status === 'Assigned'" @click="handleReject(scope.row)">拒绝</el-dropdown-item>
-                                    <el-dropdown-item v-if="['Confirmed', 'Publishing', 'Registering'].includes(scope.row.status)" @click="handlePublish(scope.row)">{{ ['Publishing', 'Registering'].includes(scope.row.status) ? '编辑招募' : '发布招募' }}</el-dropdown-item>
-                                    <el-dropdown-item v-if="['Publishing', 'Registering'].includes(scope.row.status)" @click="handleCancelPublish(scope.row)">撤销招募</el-dropdown-item>
-                                    <el-dropdown-item v-if="['Publishing', 'Registering', 'Closed'].includes(scope.row.status)" @click="handleViewLogs(scope.row)">招募记录</el-dropdown-item>
+                                    <el-dropdown-item v-if="['Confirmed', 'Publishing', 'Registering', 'NotStarted', 'PendingRecruitment'].includes(scope.row.status)" @click="handlePublish(scope.row)">{{ ['Publishing', 'Registering'].includes(scope.row.status) ? '编辑招募' : '发布招募' }}</el-dropdown-item>
                                 </el-dropdown-menu>
                             </template>
                         </el-dropdown>
@@ -1323,6 +1338,14 @@
                             <el-radio label="Scheduled">定时发布</el-radio>
                         </el-radio-group>
                     </el-form-item>
+                    <el-form-item v-if="publishForm.publishType === 'Scheduled'" label="发布时间">
+                        <el-date-picker
+                            v-model="publishForm.scheduleTime"
+                            type="datetime"
+                            placeholder="请选择定时发布时间"
+                            style="width: 100%"
+                        ></el-date-picker>
+                    </el-form-item>
                 </el-form>
                 <template #footer>
                     <el-button @click="publishVisible = false">取消</el-button>
@@ -1346,19 +1369,6 @@
                         <template #default="scope"><el-button link type="primary">查看</el-button></template>
                     </el-table-column>
                 </el-table>
-            </el-dialog>
-            
-            <!-- Recruit Logs Dialog -->
-            <el-dialog v-model="logsVisible" title="招募记录" width="50%">
-                <el-table :data="currentLogs" border style="width: 100%">
-                    <el-table-column prop="action" label="操作" width="120"></el-table-column>
-                    <el-table-column prop="operator" label="操作人" width="120"></el-table-column>
-                    <el-table-column prop="time" label="操作时间" width="180"></el-table-column>
-                    <el-table-column prop="content" label="操作内容"></el-table-column>
-                </el-table>
-                <template #footer>
-                    <el-button @click="logsVisible = false">关闭</el-button>
-                </template>
             </el-dialog>
         </div>
     </script>
@@ -2231,7 +2241,8 @@
                 const currentCamp = ref({});
                 const currentPlanInfo = ref({});
                 const formRef = ref(null);
-
+                
+                const filterStatus = ref('');
                 const searchKeyword = ref('');
                 const filterDateRange = ref(null);
                 
@@ -2244,8 +2255,9 @@
                 const schools = ['北京大学', '清华大学', '复旦大学', '上海交通大学', '浙江大学', '武汉大学', '哈尔滨工业大学'];
                 
                 const tableData = ref([
-                    { id: 1, campName: '营销管培-一期(复旦)', planName: '数字化营销管培生计划', enterprise: '某大型快消集团', school: '复旦大学', startDate: '2024-08-01', endDate: '2024-08-31', enrolled: 15, headcount: 15, status: 'Pending', courses: [] },
-                    { id: 2, campName: '营销管培-二期(交大)', planName: '数字化营销管培生计划', enterprise: '某大型快消集团', school: '上海交通大学', startDate: '2024-08-01', endDate: '2024-08-31', enrolled: 12, headcount: 15, status: 'Pending', courses: [] },
+                    { id: 5, campName: '大数据分析-二期(浙大)', planName: '大数据分析师培养计划', enterprise: '某数据科技公司', school: '浙江大学', startDate: '2024-10-01', endDate: '2024-12-31', enrolled: 0, headcount: 20, status: 'Draft', courses: [] },
+                    { id: 6, campName: 'AI算法-一期(武大)', planName: 'AI算法工程师培养计划', enterprise: '某人工智能公司', school: '武汉大学', startDate: '2024-09-01', endDate: '2024-11-30', enrolled: 0, headcount: 25, status: 'Pending', courses: [] },
+                    { id: 7, campName: '云计算-一期(哈工大)', planName: '云计算架构师培养计划', enterprise: '某云服务公司', school: '哈尔滨工业大学', startDate: '2024-08-01', endDate: '2024-10-31', enrolled: 18, headcount: 20, status: 'Recruiting', courses: [] },
                     { id: 3, campName: 'Java后端-一期(北大)', planName: 'Java 高级后端开发特训营', enterprise: '某知名互联网公司', school: '北京大学', startDate: '2024-07-01', endDate: '2024-09-30', enrolled: 30, headcount: 30, status: 'Ongoing', courses: [] },
                     { id: 4, campName: '大数据分析-一期(清华)', planName: '大数据分析师培养计划', enterprise: '某数据科技公司', school: '清华大学', startDate: '2023-09-01', endDate: '2023-12-01', enrolled: 20, headcount: 20, status: 'Finished', courses: [] }
                 ]);
@@ -2270,18 +2282,25 @@
                 };
 
                 const getStatusLabel = (status) => {
-                    const map = { 'Pending': '未开始', 'Ongoing': '进行中', 'Finished': '已结束' };
+                    const map = { 'Pending': '未开始', 'Recruiting': '待招募', 'Ongoing': '进行中', 'Finished': '已结束', 'Draft': '草稿' };
                     return map[status] || status;
                 };
                 const getStatusType = (status) => {
-                    const map = { 'Pending': 'info', 'Ongoing': 'primary', 'Finished': 'danger' };
+                    const map = { 'Pending': 'info', 'Recruiting': 'warning', 'Ongoing': 'primary', 'Finished': 'danger', 'Draft': 'info' };
                     return map[status] || '';
                 };
                 
                 const determineStatus = (startDate, endDate) => {
+                    // Logic moved to explicit state management (submitForm defaults to Pending, handleStart to Recruiting)
+                    // But for robustness, if date is past end date, it should be Finished.
+                    // If date is within range, it should be Recruiting or Ongoing? 
+                    // User says: Created -> Pending. Start -> Recruiting.
+                    // So we shouldn't auto-set to Ongoing unless maybe some other trigger?
+                    // For now, let's keep it simple: creation forces Pending.
+                    // This helper might still be useful for initial guess or finished check.
                     const now = new Date().toISOString().split('T')[0];
                     if (endDate && now > endDate) return 'Finished';
-                    if (startDate && endDate && now >= startDate && now <= endDate) return 'Ongoing';
+                    // if (startDate && endDate && now >= startDate && now <= endDate) return 'Ongoing'; // Removed auto-ongoing
                     return 'Pending';
                 };
 
@@ -2350,7 +2369,7 @@
                             content: course.content,
                             teacher: course.teacher,
                             schedule: existing ? existing.schedule : '',
-                            location: existing ? existing.location : '',
+                            scheduleEnd: existing ? existing.scheduleEnd : '',
                             selected: !!existing
                         };
                     });
@@ -2360,14 +2379,14 @@
 
                 const saveCourseConfig = () => {
                     if (!courseConfigCamp.value) return;
-                    const selected = courseConfigList.value.filter(item => item.selected && item.schedule && item.location);
+                    const selected = courseConfigList.value.filter(item => item.selected && item.schedule && item.scheduleEnd);
                     const newCourses = selected.map(item => ({
                         courseId: item.courseId,
                         name: item.name,
                         content: item.content,
                         teacher: item.teacher,
                         schedule: item.schedule,
-                        location: item.location
+                        scheduleEnd: item.scheduleEnd
                     }));
                     courseConfigCamp.value.courses = newCourses;
                     currentCampCourses.value = newCourses.slice().sort((a, b) => {
@@ -2379,12 +2398,12 @@
                 };
 
                 const handleStart = (row) => {
-                    if (!confirmationStore.confirmedCamps.includes(row.campName)) {
-                        ElMessage.warning('企业未确认名单，暂不可启动');
-                        return;
-                    }
-                    row.status = 'Ongoing';
-                    ElMessage.success(`培训营「${row.campName}」已启动`);
+                    // if (!confirmationStore.confirmedCamps.includes(row.campName)) {
+                    //     ElMessage.warning('企业未确认名单，暂不可启动');
+                    //     return;
+                    // }
+                    row.status = 'Recruiting';
+                    ElMessage.success('培训营已开启，等待学校发布招募');
                 };
 
                 const onPlanChange = (planIds) => {
@@ -2417,7 +2436,9 @@
                         const matchDate = !filterDateRange.value || 
                             (item.startDate >= filterDateRange.value[0] && item.endDate <= filterDateRange.value[1]);
                         
-                        return matchKeyword && matchDate;
+                        const matchStatus = !filterStatus.value || item.status === filterStatus.value;
+
+                        return matchKeyword && matchDate && matchStatus;
                     });
                 });
 
@@ -2505,15 +2526,50 @@
                     dialogVisible.value = true;
                 };
 
-                const handleConfirm = (row) => {
-                    ElMessageBox.confirm('确认发送最终名单给企业吗?', '提示', { type: 'success' }).then(() => {
-                        ElMessage.success('名单已发送');
-                    });
-                };
-
                 const showQRCode = (row) => {
                     currentCamp.value = row;
                     qrVisible.value = true;
+                };
+
+                const saveDraft = () => {
+                    if (!form.campName) {
+                        ElMessage.warning('请输入培训营名称以保存草稿');
+                        return;
+                    }
+                    
+                    const selectedPlans = approvedPlans.filter(p => form.planIds.includes(p.id));
+                    const planNames = selectedPlans.map(p => p.planName).join(', ');
+                    const enterprises = [...new Set(selectedPlans.map(p => p.enterprise))].join(', ');
+
+                    const newId = form.id || Date.now();
+                    const newItem = {
+                        id: newId,
+                        campName: form.campName,
+                        planName: planNames,
+                        enterprise: enterprises,
+                        school: form.school,
+                        startDate: form.dateRange && form.dateRange[0] ? form.dateRange[0] : '',
+                        endDate: form.dateRange && form.dateRange[1] ? form.dateRange[1] : '',
+                        headcount: form.headcount || 0,
+                        status: 'Draft',
+                        passScoreThreshold: form.passScoreThreshold,
+                        targetPassRate: form.targetPassRate,
+                        requiredLessons: form.requiredLessons,
+                        attendanceWeight: form.attendanceWeight,
+                        reviewWeight: form.reviewWeight,
+                        badges: form.badges ? JSON.parse(JSON.stringify(form.badges)) : []
+                    };
+
+                    if (form.id) {
+                        const idx = tableData.value.findIndex(item => item.id === form.id);
+                        if (idx !== -1) tableData.value[idx] = { ...tableData.value[idx], ...newItem };
+                    } else {
+                        newItem.enrolled = 0;
+                        newItem.courses = [];
+                        tableData.value.push(newItem);
+                    }
+                    dialogVisible.value = false;
+                    ElMessage.success('草稿已保存');
                 };
 
                 const submitForm = async () => {
@@ -2550,8 +2606,25 @@
 
                             if (form.id) {
                                 const idx = tableData.value.findIndex(item => item.id === form.id);
-                                if (idx !== -1) tableData.value[idx] = { ...tableData.value[idx], ...newItem };
+                                if (idx !== -1) {
+                                    tableData.value[idx] = { 
+                                        ...tableData.value[idx], ...newItem 
+                                    };
+                                    // If previous status was Draft, new status should be Pending (as per requirement "saved data is Pending")
+                                    // If previous status was not Draft, we should probably keep it or check logic?
+                                    // User said: "创建完数据保存后的数据为未开始" (Created data saved is Pending)
+                                    // This usually implies new or draft -> pending.
+                                    // If editing an already started camp, we probably shouldn't reset to Pending unless user wants?
+                                    // Let's assume editing non-draft preserves status, editing draft becomes Pending.
+                                    const oldStatus = tableData.value[idx].status;
+                                    if (oldStatus === 'Draft') {
+                                        tableData.value[idx].status = 'Pending';
+                                    }
+                                }
                             } else {
+                                newItem.enrolled = 0;
+                                newItem.courses = [];
+                                newItem.status = 'Pending'; // Explicitly set to Pending for new items
                                 tableData.value.push(newItem);
                             }
                             dialogVisible.value = false;
@@ -2562,7 +2635,7 @@
 
                 return { tableData, filteredTableData, searchKeyword, filterDateRange, dialogVisible, dialogTitle, qrVisible, currentCamp, form, rules, formRef, 
                          approvedPlans, schools, getStatusLabel, getStatusType, isViewMode, currentPlanInfo, currentCampCourses,
-                         handleCreate, handleEdit, showQRCode, onPlanChange, submitForm, handleToStudent, handleStart, handleSearch, handleDelete, handleDetail, handleConfirm,
+                         handleCreate, handleEdit, showQRCode, onPlanChange, submitForm, saveDraft, handleToStudent, handleStart, handleSearch, handleDelete, handleDetail,
                          courseConfigVisible, courseConfigCamp, courseConfigList, handleConfigCourses, saveCourseConfig,
                          courseFilterKeyword, selectedCourseConfigList, filteredCoursePoolList,
                          addBadge, removeBadge, handleBadgeIconBeforeUpload };
@@ -2751,35 +2824,23 @@
                 const studentList = ref([]);
                 
                 const tableData = ref([
-                    { id: 101, planName: 'Java 全栈开发特训营', enterprise: '某知名互联网公司', positionType: '技术类', headcount: 50, enrolled: 32, period: '2024-03-01~2024-06-30', status: 'Registering', publishType: 'Now', deadline: '2024-02-28', content: '全栈开发特训...', location: '北京', budget: '¥250,000', education: '本科, 硕士', major: '计算机, 软件工程', skills: 'Java, Spring Boot, MySQL, Redis', remark: '重点培养分布式系统架构设计能力，对标阿里P6级别。' },
-                    { id: 102, planName: '产品经理精英训练营', enterprise: '某知名互联网公司', positionType: '管理类', headcount: 30, enrolled: 12, period: '2024-04-01~2024-05-01', status: 'Publishing', publishType: 'Now', deadline: '2024-03-20', content: '面向2024届毕业生...', location: '上海', budget: '¥120,000', education: '本科', major: '市场营销, 广告学', skills: '数据分析, 策划能力', remark: '面向应届毕业生，培养全渠道营销人才。' },
-                    { id: 103, planName: 'AI大模型应用实战', enterprise: '未来科技', positionType: '技术类', headcount: 40, enrolled: 40, period: '2024-05-01~2024-07-30', status: 'Closed', location: '深圳', budget: '¥300,000', education: '硕士', major: '人工智能', skills: 'Python, PyTorch', remark: '报名已结束，准备开营' },
-                    { id: 104, planName: '高级前端架构师', enterprise: '云端互联', positionType: '技术类', headcount: 20, enrolled: 20, period: '2024-02-01~2024-04-30', status: 'Training', location: '杭州', budget: '¥180,000', education: '本科', major: '计算机', skills: 'Vue3, React, Node.js', remark: '架构设计能力提升' },
-                    { id: 105, planName: '数字化运营专家', enterprise: '电商集团', positionType: '运营类', headcount: 25, enrolled: 25, period: '2023-11-01~2024-01-31', status: 'Finished', location: '广州', budget: '¥150,000', education: '本科', major: '电子商务', skills: '数据分析, 用户增长', remark: '已结营' },
-                    { id: 106, planName: '区块链技术入门', enterprise: '链上科技', positionType: '技术类', headcount: 30, enrolled: 0, period: '2024-06-01~2024-08-31', status: 'NotStarted', location: '成都', budget: '¥200,000', education: '本科', major: '计算机', skills: 'Go, Solidity', remark: '等待开营' },
+                    { id: 105, planName: '高级前端架构师', enterprise: '云端互联', positionType: '技术类', headcount: 20, enrolled: 0, period: '2024-02-01~2024-04-30', status: 'NotStarted', location: '杭州', budget: '¥180,000', education: '本科', major: '计算机', skills: 'Vue3, React, Node.js', remark: '架构设计能力提升' },
+                    { id: 108, planName: 'Java全栈开发', enterprise: '创新软件', positionType: '技术类', headcount: 50, enrolled: 0, period: '2024-03-01~2024-06-30', status: 'PendingRecruitment', location: '上海', budget: '¥250,000', education: '本科', major: '软件工程', skills: 'Java, Spring Boot, MySQL', remark: '急需人才' },
+                    { id: 103, planName: 'AI大模型应用实战', enterprise: '未来科技', positionType: '技术类', headcount: 40, enrolled: 15, period: '2024-05-01~2024-07-30', status: 'Registering', location: '深圳', budget: '¥300,000', education: '硕士', major: '人工智能', skills: 'Python, PyTorch', remark: '报名已结束，准备开营' },
+                    { id: 104, planName: '区块链技术入门', enterprise: '链上科技', positionType: '技术类', headcount: 30, enrolled: 30, period: '2024-06-01~2024-08-31', status: 'Closed', location: '成都', budget: '¥200,000', education: '本科', major: '计算机', skills: 'Go, Solidity', remark: '等待开营' },
+                    { id: 106, planName: '大数据架构师', enterprise: '数智科技', positionType: '技术类', headcount: 25, enrolled: 25, period: '2024-01-01~2024-03-31', status: 'Training', location: '广州', budget: '¥220,000', education: '本科', major: '计算机', skills: 'Hadoop, Spark', remark: '进行中' },
+                    { id: 107, planName: '数字化运营专家', enterprise: '电商集团', positionType: '运营类', headcount: 25, enrolled: 25, period: '2023-11-01~2024-01-31', status: 'Finished', location: '广州', budget: '¥150,000', education: '本科', major: '电子商务', skills: '数据分析, 用户增长', remark: '已结营' }
                 ]);
                 
-                const publishForm = reactive({ title: '', content: '', deadline: '', publishType: 'Now' });
+                const publishForm = reactive({ title: '', content: '', deadline: '', publishType: 'Now', scheduleTime: '' });
                 
                 const getStatusLabel = (status) => {
-                    const map = { 'Assigned': '待确认', 'Confirmed': '已接收', 'Publishing': '招募中', 'Registering': '招募中', 'Closed': '报名截止', 'Rejected': '已拒绝', 'NotStarted': '未开始', 'Training': '进行中', 'Finished': '已结束' };
+                    const map = { 'Publishing': '招募中', 'Registering': '招募中', 'Closed': '名单审核', 'NotStarted': '未开始', 'Training': '进行中', 'Finished': '已结束', 'PendingRecruitment': '待招募' };
                     return map[status] || status;
                 };
                 const getStatusType = (status) => {
-                    const map = { 'Assigned': 'warning', 'Confirmed': 'info', 'Publishing': 'primary', 'Registering': 'primary', 'Closed': 'info', 'Rejected': 'danger', 'NotStarted': 'info', 'Training': 'success', 'Finished': 'info' };
+                    const map = { 'Publishing': 'primary', 'Registering': 'primary', 'Closed': 'warning', 'NotStarted': 'info', 'Training': 'success', 'Finished': 'info', 'PendingRecruitment': 'warning' };
                     return map[status] || '';
-                };
-
-                const logsVisible = ref(false);
-                const publishLogs = ref([
-                    { id: 1, planId: 101, action: '发布招募', operator: '管理员', time: '2024-02-20 10:00:00', content: '首次发布招募信息' },
-                    { id: 2, planId: 102, action: '发布招募', operator: '管理员', time: '2024-03-10 14:30:00', content: '发布产品经理训练营招募' },
-                    { id: 3, planId: 102, action: '编辑招募', operator: '管理员', time: '2024-03-12 09:15:00', content: '修改报名截止时间至2024-03-20' }
-                ]);
-                const currentLogs = ref([]);
-                const handleViewLogs = (row) => {
-                    currentLogs.value = publishLogs.value.filter(log => log.planId === row.id);
-                    logsVisible.value = true;
                 };
 
                 const handleConfirm = (row) => {
@@ -2802,45 +2863,25 @@
                     publishForm.content = row.content || '';
                     publishForm.deadline = row.deadline || '';
                     publishForm.publishType = row.publishType || 'Now';
+                    publishForm.scheduleTime = row.scheduleTime || '';
                     publishVisible.value = true; 
                 };
 
                 const confirmPublish = () => { 
+                    if (publishForm.publishType === 'Scheduled' && !publishForm.scheduleTime) {
+                        ElMessage.warning('请选择定时发布时间');
+                        return;
+                    }
                     const idx = tableData.value.findIndex(item => item.id === currentPlan.value.id);
                     if (idx !== -1) {
                         tableData.value[idx].status = 'Publishing';
                         tableData.value[idx].content = publishForm.content;
                         tableData.value[idx].deadline = publishForm.deadline;
                         tableData.value[idx].publishType = publishForm.publishType;
-                        publishLogs.value.push({
-                            id: Date.now(),
-                            planId: currentPlan.value.id,
-                            action: '发布招募',
-                            operator: '管理员',
-                            time: new Date().toISOString().replace('T',' ').slice(0,19),
-                            content: `发布：${publishForm.title}`
-                        });
+                        tableData.value[idx].scheduleTime = publishForm.scheduleTime;
                     }
                     publishVisible.value = false; 
                     ElMessage.success('发布成功'); 
-                };
-
-                const handleCancelPublish = (row) => {
-                    ElMessageBox.confirm('确认撤销该计划的招募信息吗？', '撤销招募', { type: 'warning' }).then(() => {
-                        row.status = 'Confirmed';
-                        row.content = '';
-                        row.deadline = '';
-                        row.publishType = '';
-                        publishLogs.value.push({
-                            id: Date.now(),
-                            planId: row.id,
-                            action: '撤销招募',
-                            operator: '管理员',
-                            time: new Date().toISOString().replace('T',' ').slice(0,19),
-                            content: '已撤销该计划的招募信息'
-                        });
-                        ElMessage.success('已撤销招募');
-                    });
                 };
 
                 const handleViewStudents = (row) => {
@@ -2861,8 +2902,8 @@
                 };
 
                 return { tableData, publishVisible, studentsVisible, detailVisible, publishForm, currentPlan, currentPlanDetail, studentList,
-                         getStatusLabel, getStatusType, logsVisible, currentLogs, publishLogs,
-                         handleConfirm, handleReject, handlePublish, confirmPublish, handleCancelPublish, handleViewStudents, handleDetail, handleViewLogs };
+                         getStatusLabel, getStatusType,
+                         handleConfirm, handleReject, handlePublish, confirmPublish, handleViewStudents, handleDetail };
             }
         };
 

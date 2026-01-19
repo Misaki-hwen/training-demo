@@ -149,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const loading = ref(false)
@@ -173,12 +173,9 @@ const cityMap = {
 }
 const getCityList = (province) => cityMap[province] || []
 
-const tableData = ref([
-  { id: 101, planName: 'Java 全栈开发特训营', positionType: '技术类', headcount: 50, startDate: '2024-03-01', endDate: '2024-06-30', province: 'Beijing', city: 'Beijing', address: '海淀区中关村软件园二期', education: ['本科', '硕士'], budgetFee: 250000, settlementMethod: 'Phased', budgetDesc: '含教材费、讲师费', status: 'Published', submitTime: '2024-02-15', remark: '重点培养分布式系统架构设计能力。' },
-  { id: 102, planName: '产品经理精英训练营', positionType: '管理类', headcount: 30, startDate: '2024-04-01', endDate: '2024-05-01', province: 'Shanghai', city: 'Shanghai', address: '浦东新区陆家嘴', education: ['本科'], budgetFee: 120000, settlementMethod: 'Post', budgetDesc: '', status: 'Published', submitTime: '2024-03-01', remark: '培养产品思维。' },
-  { id: 103, planName: '大数据分析师培养计划', positionType: '技术类', headcount: 20, startDate: '2024-05-01', endDate: '2024-08-01', province: 'Guangdong', city: 'Shenzhen', address: '南山区科技园', education: ['本科'], budgetFee: 180000, settlementMethod: 'Post', budgetDesc: '含云资源使用费', remark: '草稿状态测试', status: 'Draft', submitTime: '' },
-  { id: 104, planName: '新媒体运营实习生', positionType: '营销类', headcount: 10, startDate: '2024-06-01', endDate: '2024-07-01', province: 'Beijing', city: 'Beijing', address: '朝阳区CBD', education: ['大专'], budgetFee: 50000, settlementMethod: 'Post', budgetDesc: '', remark: '驳回测试', status: 'Rejected', submitTime: '2024-03-10', auditComment: '预算过高，请重新调整', auditTime: '2024-03-11' }
-])
+const tableData = ref([])
+
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
 const form = reactive({ 
   id: null, planName: '', positionType: '', headcount: 0, 
@@ -253,29 +250,72 @@ const handleSubmit = (row) => {
 
 const submitForm = async () => {
   if (!formRef.value) return
-  await formRef.value.validate((valid) => {
+  await formRef.value.validate(async (valid) => {
     if (valid) {
-      if (form.id) {
-        const idx = tableData.value.findIndex(item => item.id === form.id)
-        if (idx !== -1) {
-          tableData.value[idx] = { 
-            ...tableData.value[idx], ...form, 
-            startDate: form.dateRange[0], endDate: form.dateRange[1], 
-            status: form.status === 'Rejected' ? 'Pending' : form.status 
-          }
-          if(form.status === 'Rejected') {
-            tableData.value[idx].submitTime = new Date().toISOString().split('T')[0]
-          }
-        }
-      } else {
-        tableData.value.push({ 
-          id: Date.now(), ...form, 
-          startDate: form.dateRange[0], endDate: form.dateRange[1], 
-          status: 'Draft', submitTime: '' 
-        })
+      const payload = {
+        enterprise_id: 1,
+        name: form.planName,
+        position_type: form.positionType,
+        headcount: form.headcount,
+        budget: form.budgetFee,
+        education_requirements: form.education.join(','),
+        major_requirements: form.major,
+        skills_requirements: form.skills,
+        start_date: form.dateRange[0] || null,
+        end_date: form.dateRange[1] || null,
+        location: form.city || form.province || '',
+        settlement_method: form.settlementMethod,
+        remark: form.remark
       }
-      dialogVisible.value = false
-      ElMessage.success('保存成功')
+      loading.value = true
+      try {
+        const url = form.id ? `${API_BASE}/api/plans/${form.id}` : `${API_BASE}/api/plans/`
+        const method = form.id ? 'PUT' : 'POST'
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        if (!res.ok) {
+          throw new Error('接口调用失败')
+        }
+        const data = await res.json()
+        const mapped = {
+          id: data.id,
+          planName: data.name,
+          positionType: data.position_type,
+          headcount: data.headcount,
+          startDate: data.start_date,
+          endDate: data.end_date,
+          province: form.province,
+          city: form.city,
+          address: form.address,
+          education: form.education.slice(),
+          major: form.major,
+          skills: form.skills,
+          budgetFee: form.budgetFee,
+          settlementMethod: form.settlementMethod,
+          budgetDesc: form.budgetDesc,
+          remark: form.remark,
+          status: data.status,
+          auditComment: form.auditComment,
+          auditTime: form.auditTime,
+          submitTime: form.submitTime
+        }
+        if (form.id) {
+          const idx = tableData.value.findIndex(item => item.id === form.id)
+          if (idx !== -1) tableData.value[idx] = mapped
+        } else {
+          tableData.value.push(mapped)
+          form.id = data.id
+        }
+        dialogVisible.value = false
+        ElMessage.success('保存成功')
+      } catch (e) {
+        ElMessage.error('保存失败，请检查后端服务')
+      } finally {
+        loading.value = false
+      }
     }
   })
 }
@@ -287,6 +327,39 @@ const handleDelete = (row) => {
   })
 }
 const handleSearch = () => ElMessage.success('搜索已执行')
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const res = await fetch(`${API_BASE}/api/plans/`)
+    if (!res.ok) throw new Error('接口调用失败')
+    const list = await res.json()
+    tableData.value = list.map(item => ({
+      id: item.id,
+      planName: item.name,
+      positionType: item.position_type,
+      headcount: item.headcount,
+      startDate: item.start_date,
+      endDate: item.end_date,
+      province: '',
+      city: item.location,
+      address: '',
+      education: item.education_requirements ? item.education_requirements.split(',') : [],
+      major: item.major_requirements,
+      skills: item.skills_requirements,
+      budgetFee: item.budget,
+      settlementMethod: item.settlement_method,
+      budgetDesc: '',
+      remark: item.remark,
+      status: item.status,
+      submitTime: ''
+    }))
+  } catch (e) {
+    ElMessage.error('加载计划列表失败，请检查后端服务')
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <style scoped>
