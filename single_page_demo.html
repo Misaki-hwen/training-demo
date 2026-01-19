@@ -222,7 +222,7 @@
                             <span>企业端</span>
                         </template>
                         <el-menu-item index="/enterprise?tab=plan">计划管理</el-menu-item>
-                        <el-menu-item index="/enterprise?tab=screening">学生筛选</el-menu-item>
+                        <el-menu-item index="/enterprise?tab=screening">学生管理</el-menu-item>
                         <el-menu-item index="/enterprise?tab=confirmation">名单确认</el-menu-item>
                         <el-menu-item index="/enterprise?tab=monitoring">培训考勤</el-menu-item>
                         <el-menu-item index="/enterprise?tab=results">考核结果</el-menu-item>
@@ -436,7 +436,7 @@
 
     <script type="text/x-template" id="tmpl-student-screening">
         <div>
-            <div class="card-header"><h3>学生筛选</h3></div>
+            <div class="card-header"><h3>学生管理</h3></div>
             <div class="filter-container">
                 <el-select v-model="filterPlan" placeholder="选择计划" style="width: 200px;">
                     <el-option label="Java 高级后端开发特训营" value="1"></el-option>
@@ -556,7 +556,7 @@
                 </el-table-column>
             </el-table>
 
-            <el-dialog v-model="detailDialogVisible" title="学员考勤详情" width="50%">
+            <el-drawer v-model="detailDialogVisible" title="学员考勤详情" size="50%">
                 <div v-if="currentStudent">
                     <div style="margin-bottom: 15px; font-weight: bold; font-size: 16px;">
                         {{ currentStudent.name }} ({{ currentStudent.school }})
@@ -581,7 +581,7 @@
                 <template #footer>
                     <el-button @click="detailDialogVisible = false">关闭</el-button>
                 </template>
-            </el-dialog>
+            </el-drawer>
 
             <el-dialog v-model="statusDialogVisible" title="更改出勤状态" width="30%">
                 <el-form>
@@ -1086,7 +1086,9 @@
             <el-tabs type="card" v-model="activeSubTab">
                 <el-tab-pane label="平台初筛" name="screening">
                      <div class="filter-container">
-                         <el-input v-model="filterCamp" placeholder="培训营名称" style="width: 200px; margin-right: 10px;" clearable></el-input>
+                         <el-select v-model="filterCamp" placeholder="筛选培训营" style="width: 200px; margin-right: 10px;" clearable filterable>
+                             <el-option v-for="item in campOptions" :key="item.value" :label="item.label" :value="item.value"></el-option>
+                         </el-select>
                          <el-input placeholder="姓名/学校" style="width: 200px;"></el-input>
                          <el-select placeholder="初筛状态" style="width: 120px;">
                              <el-option label="待筛选" value="Pending"></el-option>
@@ -1115,8 +1117,8 @@
                              <template #default="scope">
                                  <el-button size="small" type="success" @click="updateScreenStatus(scope.row, 'Passed')">通过</el-button>
                                  <el-button size="small" type="danger" @click="updateScreenStatus(scope.row, 'Rejected')">淘汰</el-button>
-                                 <el-button size="small" link>详情</el-button>
-                             </template>
+                                <el-button size="small" link>查看简历</el-button>
+                            </template>
                          </el-table-column>
                      </el-table>
                 </el-tab-pane>
@@ -2158,7 +2160,7 @@
         const confirmationStore = reactive({ confirmedCamps: [] });
 
         // --- 2. Operation Logic ---
-        const opStore = reactive({ activeTab: 'audit', filterCamp: '' });
+        const opStore = reactive({ activeTab: 'audit', filterCamp: '', lastOperatedCamp: '' });
 
         const courseStore = reactive({
             allCourses: [
@@ -2657,6 +2659,22 @@
                     { name: '李九', school: '上海交通大学', major: '软件工程', camp: '营销管培-二期(交大)', match: '92%', status: 'Pending' }
                 ]);
                 
+                const campOptions = computed(() => {
+                    const camps = new Set(screeningList.value.map(item => item.camp));
+                    return Array.from(camps).map(camp => ({ label: camp, value: camp }));
+                });
+
+                // Initialize from last operated camp if available
+                if (opStore.lastOperatedCamp) {
+                    filterCamp.value = opStore.lastOperatedCamp;
+                }
+
+                Vue.watch(filterCamp, (newVal) => {
+                     if (newVal) {
+                         opStore.lastOperatedCamp = newVal;
+                     }
+                });
+                
                 // Watch for shared state changes
                 Vue.watch(() => opStore.filterCamp, (newVal) => {
                     if (newVal) {
@@ -2710,7 +2728,7 @@
                     ElMessage.success('最终名单已发送给企业');
                 };
 
-                return { activeSubTab, screeningList, filteredScreeningList, filterCamp, finalList,
+                return { activeSubTab, screeningList, filteredScreeningList, filterCamp, finalList, campOptions,
                          getScreenStatusLabel, getScreenStatusType, getOpConfirmStatusText,
                          handleSelectionChange, updateScreenStatus, batchScreen, confirmStudent, sendToEnterprise };
             }
