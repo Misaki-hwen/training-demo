@@ -812,6 +812,7 @@
                         <el-option label="草稿" value="Draft"></el-option>
                         <el-option label="未开始" value="Pending"></el-option>
                         <el-option label="待招募" value="Recruiting"></el-option>
+                        <el-option label="名单审核" value="ListAudit"></el-option>
                         <el-option label="进行中" value="Ongoing"></el-option>
                         <el-option label="已结束" value="Finished"></el-option>
                     </el-select>
@@ -1179,19 +1180,22 @@
         <div>
             <div class="card-header"><h3>结算管理</h3></div>
             <el-table :data="tableData" border style="width: 100%">
-                <el-table-column prop="id" label="结算单号"></el-table-column>
+                <el-table-column prop="orderNo" label="结算单号"></el-table-column>
                 <el-table-column prop="enterprise" label="企业名称"></el-table-column>
-                <el-table-column prop="camp" label="培训营"></el-table-column>
+                <el-table-column prop="campName" label="培训营"></el-table-column>
                 <el-table-column prop="amount" label="结算金额"></el-table-column>
                 <el-table-column prop="status" label="状态">
                      <template #default="scope">
-                        <el-tag :type="scope.row.status === 'Paid' ? 'success' : 'warning'">{{ scope.row.status }}</el-tag>
+                        <el-tag :type="scope.row.status === 'Paid' ? 'success' : (scope.row.status === 'PendingPayment' ? 'warning' : 'info')">
+                            {{ scope.row.status === 'Paid' ? '已支付' : (scope.row.status === 'PendingPayment' ? '待支付' : '待生成') }}
+                        </el-tag>
                     </template>
                 </el-table-column>
                 <el-table-column label="操作">
                     <template #default="scope">
-                        <el-button size="small" v-if="scope.row.status === 'Pending'" type="primary">生成结算单</el-button>
-                        <el-button size="small" v-if="scope.row.status === 'Confirmed'" type="success">确认支付</el-button>
+                        <el-button size="small" v-if="scope.row.status === 'PendingGenerate'" type="primary" @click="handleGenerate(scope.row)">生成结算单</el-button>
+                        <el-button size="small" v-if="scope.row.status === 'PendingPayment'" disabled>等待支付</el-button>
+                        <el-button size="small" v-if="scope.row.status === 'Paid'" type="success" disabled>已完成</el-button>
                     </template>
                 </el-table-column>
             </el-table>
@@ -2148,6 +2152,20 @@
                         ElMessage.warning('选中的学生中没有达标的学生');
                         return;
                     }
+                    
+                    // Add to Talent Pool Store
+                    qualifiedStudents.forEach(s => {
+                        talentStore.pool.push({
+                            name: s.name,
+                            school: s.school,
+                            major: s.major,
+                            education: '本科', // Default
+                            planName: selectedCampName.value,
+                            score: s.score,
+                            entryDate: new Date().toISOString().split('T')[0]
+                        });
+                    });
+
                     ElMessage.success(`已将 ${qualifiedStudents.map(s => s.name).join(', ')} 等 ${qualifiedStudents.length} 名学生加入人才库`);
                 };
 
@@ -2180,10 +2198,7 @@
         const TalentPool = {
             template: '#tmpl-talent-pool',
             setup() {
-                const tableData = ref([
-                    { name: '张伟', school: '北京科技大学', major: '计算机科学与技术', education: '本科', planName: 'Java 高级后端开发特训营', score: 92, entryDate: '2024-10-05' },
-                    { name: '李娜', school: '上海大学', major: '软件工程', education: '硕士', planName: 'Java 高级后端开发特训营', score: 88, entryDate: '2024-10-05' }
-                ]);
+                const tableData = computed(() => talentStore.pool);
                 return { tableData };
             }
         };
@@ -2191,10 +2206,9 @@
         const EnterpriseSettlement = {
             template: '#tmpl-enterprise-settlement',
             setup() {
-                const tableData = ref([
-                    { orderNo: 'SET-2024001', planName: 'Java 高级后端开发特训营', campName: 'Java后端-一期', headcount: 45, amount: '¥250,000', status: 'Pending' },
-                    { orderNo: 'SET-2023099', planName: '数字化营销管培生计划', campName: '营销管培-三期', headcount: 30, amount: '¥120,000', status: 'Paid' }
-                ]);
+                // Enterprise only sees orders that are Generated (PendingPayment) or Paid
+                const tableData = computed(() => settlementStore.orders.filter(o => ['PendingPayment', 'Paid'].includes(o.status)));
+                
                 const handlePay = (row) => {
                     ElMessageBox.confirm(`确认支付结算单 ${row.orderNo} ?`, '支付确认').then(() => {
                         row.status = 'Paid';
@@ -2216,6 +2230,22 @@
         };
 
         const confirmationStore = reactive({ confirmedCamps: [] });
+        
+        // Shared Stores for Data Linkage
+        const talentStore = reactive({
+            pool: [
+                { name: '张伟', school: '北京科技大学', major: '计算机科学与技术', education: '本科', planName: 'Java 高级后端开发特训营', score: 92, entryDate: '2024-10-05' },
+                { name: '李娜', school: '上海大学', major: '软件工程', education: '硕士', planName: 'Java 高级后端开发特训营', score: 88, entryDate: '2024-10-05' }
+            ]
+        });
+
+        const settlementStore = reactive({
+            orders: [
+                { orderNo: 'SET-2024001', enterprise: 'Tech Giant Corp', planName: 'Java 高级后端开发特训营', campName: 'Java后端-一期', headcount: 45, amount: '¥250,000', status: 'PendingPayment' }, // PendingPayment: 已生成，待支付
+                { orderNo: 'SET-2023099', enterprise: 'Tech Giant Corp', planName: '数字化营销管培生计划', campName: '营销管培-三期', headcount: 30, amount: '¥120,000', status: 'Paid' },
+                { orderNo: 'SET-2024002', enterprise: 'Tech Giant Corp', planName: '前端架构师成长计划', campName: '前端-二期', headcount: 20, amount: '¥180,000', status: 'PendingGenerate' } // PendingGenerate: 待生成
+            ]
+        });
 
         // --- 2. Operation Logic ---
         const opStore = reactive({ activeTab: 'audit', filterCamp: '', lastOperatedCamp: '' });
@@ -2318,6 +2348,7 @@
                     { id: 5, campName: '大数据分析-二期(浙大)', planName: '大数据分析师培养计划', enterprise: '某数据科技公司', school: '浙江大学', startDate: '2024-10-01', endDate: '2024-12-31', enrolled: 0, headcount: 20, status: 'Draft', courses: [] },
                     { id: 6, campName: 'AI算法-一期(武大)', planName: 'AI算法工程师培养计划', enterprise: '某人工智能公司', school: '武汉大学', startDate: '2024-09-01', endDate: '2024-11-30', enrolled: 0, headcount: 25, status: 'Pending', courses: [] },
                     { id: 7, campName: '云计算-一期(哈工大)', planName: '云计算架构师培养计划', enterprise: '某云服务公司', school: '哈尔滨工业大学', startDate: '2024-08-01', endDate: '2024-10-31', enrolled: 18, headcount: 20, status: 'Recruiting', courses: [] },
+                    { id: 8, campName: '前端开发-三期(交大)', planName: '前端架构师成长计划', enterprise: '某知名互联网公司', school: '上海交通大学', startDate: '2024-09-15', endDate: '2024-12-15', enrolled: 25, headcount: 25, status: 'ListAudit', courses: [] },
                     { id: 3, campName: 'Java后端-一期(北大)', planName: 'Java 高级后端开发特训营', enterprise: '某知名互联网公司', school: '北京大学', startDate: '2024-07-01', endDate: '2024-09-30', enrolled: 30, headcount: 30, status: 'Ongoing', courses: [] },
                     { id: 4, campName: '大数据分析-一期(清华)', planName: '大数据分析师培养计划', enterprise: '某数据科技公司', school: '清华大学', startDate: '2023-09-01', endDate: '2023-12-01', enrolled: 20, headcount: 20, status: 'Finished', courses: [] }
                 ]);
@@ -2342,11 +2373,11 @@
                 };
 
                 const getStatusLabel = (status) => {
-                    const map = { 'Pending': '未开始', 'Recruiting': '待招募', 'Ongoing': '进行中', 'Finished': '已结束', 'Draft': '草稿' };
+                    const map = { 'Pending': '未开始', 'Recruiting': '待招募', 'ListAudit': '名单审核', 'Ongoing': '进行中', 'Finished': '已结束', 'Draft': '草稿' };
                     return map[status] || status;
                 };
                 const getStatusType = (status) => {
-                    const map = { 'Pending': 'info', 'Recruiting': 'warning', 'Ongoing': 'primary', 'Finished': 'danger', 'Draft': 'info' };
+                    const map = { 'Pending': 'info', 'Recruiting': 'warning', 'ListAudit': 'warning', 'Ongoing': 'primary', 'Finished': 'danger', 'Draft': 'info' };
                     return map[status] || '';
                 };
                 
@@ -2861,8 +2892,12 @@
         const SettlementManagement = {
             template: '#tmpl-settlement-management',
             setup() {
-                const tableData = ref([{ id: 'SET-2024001', enterprise: '某科技公司', camp: 'Spring特训营', amount: '¥50,000', status: 'Pending' }]);
-                return { tableData };
+                const tableData = computed(() => settlementStore.orders);
+                const handleGenerate = (row) => {
+                     row.status = 'PendingPayment';
+                     ElMessage.success(`结算单 ${row.orderNo} 已生成，等待企业支付`);
+                };
+                return { tableData, handleGenerate };
             }
         };
 
@@ -3121,11 +3156,25 @@
                     if (selectedRows.value.length === 0) {
                         return ElMessage.warning('请选择要入库的学生');
                     }
-                    const qualifiedCount = selectedRows.value.filter(r => r.isQualified).length;
-                    if (qualifiedCount === 0) {
+                    const qualifiedStudents = selectedRows.value.filter(r => r.isQualified);
+                    if (qualifiedStudents.length === 0) {
                         return ElMessage.warning('所选学生均未达标，无法入库');
                     }
-                    ElMessage.success(`成功将 ${qualifiedCount} 名达标学生录入人才库`);
+                    
+                    // Add to Talent Pool Store
+                    qualifiedStudents.forEach(s => {
+                        talentStore.pool.push({
+                            name: s.name,
+                            school: s.school,
+                            major: s.major,
+                            education: '本科', // Default or from student data if available
+                            planName: selectedCampName.value || '未命名计划',
+                            score: s.score,
+                            entryDate: new Date().toISOString().split('T')[0]
+                        });
+                    });
+
+                    ElMessage.success(`成功将 ${qualifiedStudents.length} 名达标学生录入人才库`);
                 };
 
                 const filterStatus = ref('All');
