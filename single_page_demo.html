@@ -610,7 +610,10 @@
         <div>
             <div class="card-header">
                 <h3>考核结果</h3>
-                <el-button type="primary">批量录入成绩</el-button>
+                <div>
+                    <el-button type="primary">批量录入成绩</el-button>
+                    <el-button type="success" @click="handleBatchAddToTalentPool">批量入库</el-button>
+                </div>
             </div>
             <div class="filter-container" style="display: flex; gap: 10px; align-items: center; margin-bottom: 20px;">
                 <el-select v-model="selectedCampName" placeholder="选择培训营" style="width: 240px;">
@@ -620,31 +623,29 @@
             </div>
             
             <el-row :gutter="20" style="margin-bottom: 20px;">
-                <el-col :span="6"><el-card shadow="hover"><div style="text-align:center"><h3>{{ statTotal }}</h3><p>参训总人数</p></div></el-card></el-col>
-                <el-col :span="6"><el-card shadow="hover"><div style="text-align:center"><h3>{{ statQualified }}</h3><p>达标人数</p></div></el-card></el-col>
-                <el-col :span="6"><el-card shadow="hover"><div style="text-align:center"><h3 style="color:green">{{ statRate }}</h3><p>达标率</p></div></el-card></el-col>
-                <el-col :span="6"><el-card shadow="hover"><div style="text-align:center"><h3>{{ statAvgScore }}</h3><p>平均成绩</p></div></el-card></el-col>
+                <el-col :span="6"><el-card shadow="hover" style="cursor: pointer" @click="handleStatClick('Total')"><div style="text-align:center"><h3>{{ statTotal }}</h3><p>参训总人数</p></div></el-card></el-col>
+                <el-col :span="6"><el-card shadow="hover" style="cursor: pointer" @click="handleStatClick('Qualified')"><div style="text-align:center"><h3>{{ statQualified }}</h3><p>达标人数</p></div></el-card></el-col>
+                <el-col :span="6"><el-card shadow="hover" style="cursor: pointer" @click="handleStatClick('Rate')"><div style="text-align:center"><h3 style="color:green">{{ statRate }}</h3><p>达标率</p></div></el-card></el-col>
+                <el-col :span="6"><el-card shadow="hover" style="cursor: pointer" @click="handleStatClick('AvgScore')"><div style="text-align:center"><h3>{{ statAvgScore }}</h3><p>平均成绩</p></div></el-card></el-col>
             </el-row>
 
             <div ref="chartDom" style="width: 100%; height: 300px; margin-bottom: 20px;"></div>
 
             <div class="section-title">考核录入</div>
-            <el-table :data="tableData" border style="width: 100%">
+            <el-table :data="tableData" border style="width: 100%" @selection-change="handleSelectionChange">
+                <el-table-column type="selection" width="55"></el-table-column>
                 <el-table-column prop="name" label="姓名" width="120"></el-table-column>
                 <el-table-column prop="school" label="学校"></el-table-column>
                 <el-table-column prop="major" label="专业"></el-table-column>
                 <el-table-column label="考核成绩(0-100)" width="200">
                     <template #default="scope">
-                        <el-input-number v-model="scope.row.score" :min="0" :max="100" size="small"></el-input-number>
+                        <el-input-number v-model="scope.row.score" :min="0" :max="100" size="small" @change="handleScoreChange(scope.row)"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="是否达标" width="150">
                      <template #default="scope">
-                         <el-switch v-model="scope.row.isQualified" active-text="达标" inactive-text="不达标"></el-switch>
+                         <el-switch v-model="scope.row.isQualified" active-text="达标" inactive-text="不达标" @change="handleQualifiedChange(scope.row)"></el-switch>
                      </template>
-                </el-table-column>
-                <el-table-column label="操作">
-                    <template #default="scope"><el-button size="small" type="primary">保存</el-button></template>
                 </el-table-column>
             </el-table>
         </div>
@@ -1454,15 +1455,16 @@
                         <el-option label="Java后端-一期(北大)" value="1"></el-option>
                     </el-select>
                     <el-button type="primary">查询</el-button>
-                    <el-button type="success" @click="batchInput">批量录入</el-button>
+                    <el-button type="primary" @click="batchInput">批量录入成绩</el-button>
+                    <el-button type="success" @click="handleBatchAddToTalentPool">批量入库</el-button>
                 </div>
             </div>
             
             <el-row :gutter="20" style="margin-bottom: 20px;">
-                <el-col :span="6"><el-card shadow="hover"><div style="text-align:center"><h3>{{ stats.total }}</h3><p>参训总人数</p></div></el-card></el-col>
-                <el-col :span="6"><el-card shadow="hover"><div style="text-align:center"><h3>{{ stats.qualified }}</h3><p>达标人数</p></div></el-card></el-col>
-                <el-col :span="6"><el-card shadow="hover"><div style="text-align:center"><h3 style="color:green">{{ stats.rate }}%</h3><p>达标率</p></div></el-card></el-col>
-                <el-col :span="6"><el-card shadow="hover"><div style="text-align:center"><h3>{{ stats.avgScore }}</h3><p>平均成绩</p></div></el-card></el-col>
+                <el-col :span="6"><el-card shadow="hover" style="cursor: pointer" @click="handleStatClick('Total')"><div style="text-align:center"><h3>{{ stats.total }}</h3><p>参训总人数</p></div></el-card></el-col>
+                <el-col :span="6"><el-card shadow="hover" style="cursor: pointer" @click="handleStatClick('Qualified')"><div style="text-align:center"><h3>{{ stats.qualified }}</h3><p>达标人数</p></div></el-card></el-col>
+                <el-col :span="6"><el-card shadow="hover" style="cursor: pointer" @click="handleStatClick('Rate')"><div style="text-align:center"><h3 style="color:green">{{ stats.rate }}%</h3><p>达标率</p></div></el-card></el-col>
+                <el-col :span="6"><el-card shadow="hover" style="cursor: pointer" @click="handleStatClick('AvgScore')"><div style="text-align:center"><h3>{{ stats.avgScore }}</h3><p>平均成绩</p></div></el-card></el-col>
             </el-row>
             <el-row :gutter="20" style="margin-bottom: 20px;">
                 <el-col :span="8"><el-card shadow="hover"><div style="text-align:center"><h3>{{ campGoals.targetPassRate }}%</h3><p>目标达标率</p></div></el-card></el-col>
@@ -1473,22 +1475,20 @@
             <div ref="chartDom" style="width: 100%; height: 300px; margin-bottom: 20px;"></div>
 
             <div class="section-title">考核录入</div>
-            <el-table :data="tableData" border style="width: 100%">
+            <el-table :data="displayTableData" border style="width: 100%" @selection-change="handleSelectionChange">
+                <el-table-column type="selection" width="55"></el-table-column>
                 <el-table-column prop="name" label="姓名" width="120"></el-table-column>
                 <el-table-column prop="school" label="学校"></el-table-column>
                 <el-table-column prop="major" label="专业"></el-table-column>
                 <el-table-column label="考核成绩(0-100)" width="200">
                     <template #default="scope">
-                        <el-input-number v-model="scope.row.score" :min="0" :max="100" size="small" @change="onScoreChange(scope.row)"></el-input-number>
+                        <el-input-number v-model="scope.row.score" :min="0" :max="100" size="small" @change="handleScoreChange(scope.row)"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="是否达标" width="150">
                      <template #default="scope">
-                         <el-switch v-model="scope.row.isQualified" active-text="达标" inactive-text="不达标"></el-switch>
+                         <el-switch v-model="scope.row.isQualified" active-text="达标" inactive-text="不达标" @change="handleQualifiedChange(scope.row)"></el-switch>
                      </template>
-                </el-table-column>
-                <el-table-column label="操作">
-                    <template #default="scope"><el-button size="small" type="primary" @click="saveRow(scope.row)">保存</el-button></template>
                 </el-table-column>
             </el-table>
         </div>
@@ -2078,22 +2078,79 @@
                         { name: '郑十', school: '上海交通大学', major: '数据科学', score: 66, isQualified: true }
                     ]
                 };
-                const currentTableData = Vue.computed(() => {
+                const campData = Vue.computed(() => {
                     return tableMap[selectedCampName.value] || [];
                 });
-                const statTotal = Vue.computed(() => currentTableData.value.length);
-                const statQualified = Vue.computed(() => currentTableData.value.filter(i => i.isQualified).length);
+                const statTotal = Vue.computed(() => campData.value.length);
+                const statQualified = Vue.computed(() => campData.value.filter(i => i.isQualified).length);
                 const statRate = Vue.computed(() => {
                     const t = statTotal.value || 1;
                     const q = statQualified.value;
                     return Math.round((q * 100) / t) + '%';
                 });
                 const statAvgScore = Vue.computed(() => {
-                    if (currentTableData.value.length === 0) return 0;
-                    const sum = currentTableData.value.reduce((s, i) => s + (i.score || 0), 0);
-                    return (sum / currentTableData.value.length).toFixed(1);
+                    if (campData.value.length === 0) return 0;
+                    const sum = campData.value.reduce((s, i) => s + (i.score || 0), 0);
+                    return (sum / campData.value.length).toFixed(1);
+                });
+
+                const filterStatus = ref('All');
+                const sortType = ref('None');
+
+                const handleStatClick = (type) => {
+                    if (type === 'Total') {
+                        filterStatus.value = 'All';
+                        sortType.value = 'None';
+                        ElMessage.info('展示全部学生');
+                    } else if (type === 'Qualified' || type === 'Rate') {
+                        filterStatus.value = 'Qualified';
+                        sortType.value = 'None';
+                        ElMessage.info('展示达标学生');
+                    } else if (type === 'AvgScore') {
+                        filterStatus.value = 'All';
+                        sortType.value = 'ScoreDesc';
+                        ElMessage.info('按成绩排序展示');
+                    }
+                };
+
+                const displayTableData = Vue.computed(() => {
+                    let data = [...campData.value];
+                    if (filterStatus.value === 'Qualified') {
+                        data = data.filter(i => i.isQualified);
+                    }
+                    if (sortType.value === 'ScoreDesc') {
+                        data.sort((a, b) => b.score - a.score);
+                    }
+                    return data;
                 });
                 const handleQuery = () => { ElMessage.success('查询已执行'); };
+                
+                const selectedRows = ref([]);
+                const handleSelectionChange = (selection) => {
+                    selectedRows.value = selection;
+                };
+
+                const handleScoreChange = (row) => {
+                    ElMessage.success(`${row.name} 成绩更新为 ${row.score}`);
+                };
+
+                const handleQualifiedChange = (row) => {
+                    ElMessage.success(`${row.name} 状态更新为 ${row.isQualified ? '达标' : '不达标'}`);
+                };
+
+                const handleBatchAddToTalentPool = () => {
+                    if (selectedRows.value.length === 0) {
+                        ElMessage.warning('请选择要入库的学生');
+                        return;
+                    }
+                    const qualifiedStudents = selectedRows.value.filter(s => s.isQualified);
+                    if (qualifiedStudents.length === 0) {
+                        ElMessage.warning('选中的学生中没有达标的学生');
+                        return;
+                    }
+                    ElMessage.success(`已将 ${qualifiedStudents.map(s => s.name).join(', ')} 等 ${qualifiedStudents.length} 名学生加入人才库`);
+                };
+
                 let myChart;
                 onMounted(() => {
                     myChart = echarts.init(chartDom.value);
@@ -2115,7 +2172,8 @@
                         series: [{ type: 'bar', data: dist, itemStyle: { color: '#409EFF' } }]
                     });
                 });
-                return { camps, selectedCampName, chartDom, tableData: currentTableData, statTotal, statQualified, statRate, statAvgScore, handleQuery };
+                return { camps, selectedCampName, chartDom, tableData: displayTableData, statTotal, statQualified, statRate, statAvgScore,
+                         handleQuery, handleSelectionChange, handleScoreChange, handleQualifiedChange, handleBatchAddToTalentPool, handleStatClick };
             }
         };
 
@@ -2991,6 +3049,7 @@
                     { name: '李娜', school: '上海大学', major: '软件工程', score: 88, isQualified: true },
                     { name: '王强', school: '深圳大学', major: '电子信息', score: 58, isQualified: false }
                 ]);
+                const selectedRows = ref([]);
 
                 const campGoals = reactive({ passScoreThreshold: 60, targetPassRate: 80 });
                 const stats = computed(() => {
@@ -3000,7 +3059,7 @@
                     return {
                         total,
                         qualified,
-                        rate: total > 0 ? ((qualified / total) * 100).toFixed(1) : 0,
+                        rate: total > 0 ? Math.round((qualified / total) * 100) : 0,
                         avgScore
                     };
                 });
@@ -3031,11 +3090,17 @@
 
                 onMounted(initChart);
 
-                const onScoreChange = (row) => { row.isQualified = row.score >= campGoals.passScoreThreshold; };
+                const handleSelectionChange = (val) => { selectedRows.value = val; };
 
-                const saveRow = (row) => {
-                    ElMessage.success(`${row.name} 的成绩保存成功`);
-                    initChart(); // Refresh chart
+                const handleScoreChange = (row) => { 
+                    row.isQualified = row.score >= campGoals.passScoreThreshold; 
+                    initChart();
+                    ElMessage.success({ message: '成绩已实时保存', type: 'success', duration: 1000 });
+                };
+
+                const handleQualifiedChange = (row) => {
+                    initChart();
+                    ElMessage.success({ message: '状态已实时保存', type: 'success', duration: 1000 });
                 };
 
                 const batchInput = () => {
@@ -3052,7 +3117,49 @@
                     });
                 };
 
-                return { selectedCamp, tableData, chartDom, stats, campGoals, onScoreChange, saveRow, batchInput };
+                const handleBatchAddToTalentPool = () => {
+                    if (selectedRows.value.length === 0) {
+                        return ElMessage.warning('请选择要入库的学生');
+                    }
+                    const qualifiedCount = selectedRows.value.filter(r => r.isQualified).length;
+                    if (qualifiedCount === 0) {
+                        return ElMessage.warning('所选学生均未达标，无法入库');
+                    }
+                    ElMessage.success(`成功将 ${qualifiedCount} 名达标学生录入人才库`);
+                };
+
+                const filterStatus = ref('All');
+                const sortType = ref('None');
+
+                const handleStatClick = (type) => {
+                    if (type === 'Total') {
+                        filterStatus.value = 'All';
+                        sortType.value = 'None';
+                        ElMessage.info('展示全部学生');
+                    } else if (type === 'Qualified' || type === 'Rate') {
+                        filterStatus.value = 'Qualified';
+                        sortType.value = 'None';
+                        ElMessage.info('展示达标学生');
+                    } else if (type === 'AvgScore') {
+                        filterStatus.value = 'All';
+                        sortType.value = 'ScoreDesc';
+                        ElMessage.info('按成绩排序展示');
+                    }
+                };
+
+                const displayTableData = computed(() => {
+                    let data = [...tableData.value];
+                    if (filterStatus.value === 'Qualified') {
+                        data = data.filter(i => i.isQualified);
+                    }
+                    if (sortType.value === 'ScoreDesc') {
+                        data.sort((a, b) => b.score - a.score);
+                    }
+                    return data;
+                });
+
+                return { selectedCamp, tableData, displayTableData, chartDom, stats, campGoals, 
+                         handleSelectionChange, handleScoreChange, handleQualifiedChange, batchInput, handleBatchAddToTalentPool, handleStatClick };
             }
         };
 
