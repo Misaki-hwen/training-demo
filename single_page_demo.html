@@ -545,6 +545,12 @@
                 <el-table-column prop="name" label="姓名" width="120"></el-table-column>
                 <el-table-column prop="school" label="学校"></el-table-column>
                 <el-table-column prop="overallRate" label="综合出勤率" width="150">
+                    <template #header>
+                        <span>综合出勤率</span>
+                        <el-tooltip content="综合出勤率 = (正常出勤次数 + 迟到次数 × 0.8) / 总课程数" placement="top">
+                            <el-icon style="margin-left: 5px; cursor: pointer;"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                    </template>
                     <template #default="scope">
                         <el-progress :percentage="scope.row.overallRate"></el-progress>
                     </template>
@@ -951,9 +957,15 @@
                         </el-col>
                         <el-col :span="12">
                             <el-form-item label="评分权重(出勤/考核评分)">
-                                <div style="display:flex;gap:8px;">
-                                    <el-input-number v-model="form.attendanceWeight" :min="0" :max="100"></el-input-number>
-                                    <el-input-number v-model="form.reviewWeight" :min="0" :max="100"></el-input-number>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <el-input-number v-model="form.attendanceWeight" :min="0" :max="100" placeholder="出勤占比" style="width: 120px;"></el-input-number>
+                                    <span>%</span>
+                                    <span style="margin:0 5px;">+</span>
+                                    <el-input-number v-model="form.reviewWeight" :min="0" :max="100" placeholder="考核占比" style="width: 120px;"></el-input-number>
+                                    <span>%</span>
+                                    <el-tooltip content="总成绩 = 出勤得分 × 出勤权重% + 考核得分 × 考核权重%" placement="top">
+                                        <el-icon style="margin-left: 5px; color: #909399; cursor: pointer; font-size: 16px;"><QuestionFilled /></el-icon>
+                                    </el-tooltip>
                                 </div>
                             </el-form-item>
                         </el-col>
@@ -1434,8 +1446,8 @@
                     <el-table-column prop="school" label="学校"></el-table-column>
                     <el-table-column prop="status" label="状态" width="100">
                         <template #default="scope">
-                            <el-tag :type="scope.row.status === 'Present' ? 'success' : 'danger'">
-                                {{ scope.row.status === 'Present' ? '已签到' : '未签到' }}
+                            <el-tag :type="scope.row.status === 'Present' ? 'success' : (scope.row.status === 'Late' ? 'warning' : 'danger')">
+                                {{ scope.row.status === 'Present' ? '已签到' : (scope.row.status === 'Late' ? '迟到' : '未签到') }}
                             </el-tag>
                         </template>
                     </el-table-column>
@@ -1622,8 +1634,8 @@
                         <el-table-column prop="school" label="学校"></el-table-column>
                         <el-table-column prop="status" label="状态" width="100">
                             <template #default="scope">
-                                <el-tag :type="scope.row.status === 'Present' ? 'success' : 'danger'">
-                                    {{ scope.row.status === 'Present' ? '已签到' : '未签到' }}
+                                <el-tag :type="scope.row.status === 'Present' ? 'success' : (scope.row.status === 'Late' ? 'warning' : 'danger')">
+                                    {{ scope.row.status === 'Present' ? '已签到' : (scope.row.status === 'Late' ? '迟到' : '未签到') }}
                                 </el-tag>
                             </template>
                         </el-table-column>
@@ -1945,10 +1957,12 @@
                 const attendanceByCourse = reactive({
                     201: [
                         { name: '张伟', school: '北京科技大学', status: 'Present' },
-                        { name: '李娜', school: '上海大学', status: 'Present' }
+                        { name: '李娜', school: '上海大学', status: 'Late' },
+                        { name: '王强', school: '深圳大学', status: 'Present' }
                     ],
                     202: [
                         { name: '张伟', school: '北京科技大学', status: 'Absent' },
+                        { name: '李娜', school: '上海大学', status: 'Present' },
                         { name: '王强', school: '深圳大学', status: 'Present' }
                     ],
                     301: [
@@ -2377,7 +2391,7 @@
                     return map[status] || status;
                 };
                 const getStatusType = (status) => {
-                    const map = { 'Pending': 'info', 'Recruiting': 'warning', 'ListAudit': 'warning', 'Ongoing': 'primary', 'Finished': 'danger', 'Draft': 'info' };
+                    const map = { 'Pending': 'info', 'Recruiting': 'warning', 'ListAudit': 'warning', 'Ongoing': 'success', 'Finished': 'danger', 'Draft': 'info' };
                     return map[status] || '';
                 };
                 
@@ -2667,6 +2681,10 @@
                     if (!formRef.value) return;
                     await formRef.value.validate((valid) => {
                         if (valid) {
+                            if ((form.attendanceWeight || 0) + (form.reviewWeight || 0) !== 100) {
+                                ElMessage.warning('出勤权重和考核权重之和必须为100%');
+                                return;
+                            }
                             // Find all selected plans
                             const selectedPlans = approvedPlans.filter(p => form.planIds.includes(p.id));
                             const planNames = selectedPlans.map(p => p.planName).join(', ');
@@ -3065,7 +3083,8 @@
                     attendanceList.value = [
                         { name: '张三', school: '北京大学', status: 'Present', time: '13:55' },
                         { name: '李四', school: '清华大学', status: 'Present', time: '13:58' },
-                        { name: '王五', school: '北京航空航天大学', status: 'Absent', time: '-' }
+                        { name: '王五', school: '北京航空航天大学', status: 'Absent', time: '-' },
+                        { name: '赵六', school: '复旦大学', status: 'Late', time: '14:10' }
                     ];
                     detailVisible.value = true;
                 };
@@ -3260,8 +3279,8 @@
                 const getStatusLabel = (status) => ({ 'Pending': '待审核', 'Passed': '已通过', 'Rejected': '未通过' }[status] || status);
                 const getStatusType = (status) => ({ 'Pending': 'warning', 'Passed': 'success', 'Rejected': 'danger' }[status] || '');
                 
-                const getAttendanceLabel = (status) => ({ 'Present': '已参加', 'Absent': '缺勤', 'Pending': '待签到' }[status] || status);
-                const getAttendanceType = (status) => ({ 'Present': 'success', 'Absent': 'danger', 'Pending': 'info' }[status] || '');
+                const getAttendanceLabel = (status) => ({ 'Present': '已参加', 'Absent': '缺勤', 'Late': '迟到', 'Pending': '待签到' }[status] || status);
+                const getAttendanceType = (status) => ({ 'Present': 'success', 'Absent': 'danger', 'Late': 'warning', 'Pending': 'info' }[status] || '');
 
                 const viewSchedule = (row) => {
                     currentTraining.value = row;
@@ -3291,6 +3310,7 @@
                         { name: '张三', school: '北京大学', status: 'Present' },
                         { name: '李四', school: '清华大学', status: 'Present' },
                         { name: '王五', school: '北京航空航天大学', status: 'Absent' },
+                        { name: '赵六', school: '复旦大学', status: 'Late' },
                         { name: '自己', school: '我的大学', status: row.attendance }
                     ];
                     detailVisible.value = true;
